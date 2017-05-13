@@ -7,10 +7,17 @@ clone_folder: c:\gopath\src\github.com\ncw\rclone
 environment:
   GOPATH: c:\gopath
   CPATH: C:\Program Files (x86)\WinFsp\inc\fuse
-  PATH: C:\mingw-w64\x86_64-6.3.0-posix-seh-rt_v5-rev1\mingw64\bin;c:\MinGW\bin;%PATH%
+  ORIGPATH: '%PATH%'
+  NOCCPATH: c:\MinGW\bin;%GOPATH%\bin;%PATH%
+  PATHCC64: set PATH=C:\mingw-w64\x86_64-6.3.0-posix-seh-rt_v5-rev1\mingw64\bin;%NOCCPATH%
+  PATHCC32: set PATH=C:\mingw-w64\i686-6.3.0-posix-dwarf-rt_v5-rev1\mingw32\bin;%NOCCPATH%
+  PATH: '%PATHCC64%'
+  RCLONE_CONFIG_PASS:
+    secure: HbzxSy9zQ8NYWN9NNPf6ALQO9Q0mwRNqwehsLcOEHy0=
 
 install:
 - choco install winfsp -y
+- choco install zip -y
 
 build_script:
 - echo %PATH%
@@ -19,6 +26,17 @@ build_script:
 - go env
 - go install
 
-test_script:
+# FIXME
+# test_script:
+# - make quicktest
+
+deploy_script:
 - copy c:\MinGW\bin\mingw32-make.exe c:\MinGW\bin\make.exe
-- make quicktest
+- make log_since_last_release > git-log.txt
+- make version > version
+- set /p RCLONE_VERSION = < version 
+- set PATH=%PATHCC64
+- go run bin/cross-compile.go -release beta-latest -git-log /tmp/git-log.txt -include "^windows/amd64" -cgo %RCLONE_VERSION%
+- set PATH=%PATHCC32
+- go run bin/cross-compile.go -release beta-latest -git-log /tmp/git-log.txt -include "^windows/386" -cgo %RCLONE_VERSION%
+- make upload_beta
